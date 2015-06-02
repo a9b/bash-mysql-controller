@@ -52,6 +52,7 @@
 alias myd='mysql-database'
 alias myt='mysql-table'
 alias myc='mysql-config'
+alias mycc='mysql-config-detail'
 alias mys='mysql-select'
 alias myw='mysql-where-dsl'
 alias myo='mysql-option-dsl'
@@ -61,25 +62,33 @@ alias mywhere='mysql-where'
 alias myoption='mysql-option'
 alias mye='mysql-exec'
 
+# クエリログの出力先
+export PATH_MYSQL_QUERY_HISTORY
+PATH_MYSQL_QUERY_HISTORY='/tmp/mysql-query.history'
+
 red=31
 green=32
 yellow=33
 blue=34
 
-# クエリログの出力先
-export PATH_MYSQL_QUERY_HISTORY
-PATH_MYSQL_QUERY_HISTORY='/tmp/mysql-query.history'
-
 mysql-config() {
-  local last_query=`mysql-query-history |tail -1`
   if [ "$MYSQL_DB" == "" ]; then
-    echo-color $red "DBが未設定です"
+    echo-color -e $red "DBが未設定です"
     return 2>&- || exit
   fi
 
-  echo "db     :" $MYSQL_DB
+  echo-color -e $green "db     :" $MYSQL_DB
   if [ "$MYSQL_TABLE" != "" ]; then
-  echo "table  :" $MYSQL_TABLE
+  echo-color -e $green "table  :" $MYSQL_TABLE
+  fi
+}
+
+
+mysql-config-detail() {
+  local last_query=`mysql-query-history |tail -1`
+  mysql-config
+
+  if [ "$MYSQL_TABLE" != "" ]; then
   mysql-desc-exec
   echo "row    :" $MYSQL_TABLE_RECODE_NUM
   echo "where  :" $MYSQL_WHERE
@@ -114,7 +123,7 @@ mysql-database() {
 
   if [ "${grep_result}" == "" ]; then
     echo "grep : $opt"
-    echo-color $red "対象のDBがありませんでした"
+    echo-color -e $red "対象のDBがありませんでした"
     return 2>&- || exit
   fi
 
@@ -124,17 +133,13 @@ mysql-database() {
   MYSQL_OPTION=''
   unset MYSQL_DESC
 
-  result_one=`echo -e "${grep_result}" |head -1`
-  result_notone=`echo -e "${grep_result}" |tail -n +2`
-  echo-color $green "db    : ${result_one}"
-  if [ "${result_notone}" != "" ]; then
-    echo -e "${result_notone}"
-  fi
+  echo-color -ne $green "db     : "
+  echo "-e" "${grep_result}"
 }
 
 mysql-table() {
   if [ "$MYSQL_DB" == "" ]; then
-    echo-color $red 'DBが未設定です'
+    echo-color -e $red 'DBが未設定です'
     return 2>&- || exit
   fi
 
@@ -147,7 +152,7 @@ mysql-table() {
   if [ "${grep_result}" == "" ]; then
     echo "db   : ${MYSQL_DB}"
     echo "grep : $opt"
-    echo-color $red "対象のテーブルがありませんでした"
+    echo-color -e $red "対象のテーブルがありませんでした"
     return 2>&- || exit
   fi
 
@@ -155,20 +160,8 @@ mysql-table() {
   MYSQL_TABLE_RECODE_NUM=`mysql-recode-count-exec`
   MYSQL_DESC=`mysql-desc-exec`
 
-  local command="echo -e '$grep_result' |wc -l"
-  local result_num=`eval "$command"`
-  if [ "${result_num}" -eq "1" ]; then
-    mysql-desc-exec
-    echo-color $green "${MYSQL_DB}.${grep_result} ${MYSQL_TABLE_RECODE_NUM}rows"
-    return 2>&- || exit
-  fi
-
-  result_one=`echo -e "table : ${grep_result}" |head -1`
-  result_notone=`echo -e "${grep_result}" |tail -n +2`
-  echo-color $green "${result_one}"
-  if [ "${result_notone}" != "" ]; then
-    echo -e "${result_notone}"
-  fi
+  echo-color -ne $green "table  : "
+  echo "-e" "${grep_result}"
 }
 
 mysql-desc-exec() {
@@ -181,12 +174,12 @@ mysql-recode-count-exec() {
 
 mysql-select() {
   if [ "$MYSQL_DB" == "" ]; then
-    echo-color $red 'DBが未設定です'
+    echo-color -e $red 'DBが未設定です'
     return 2>&- || exit
   fi
 
   if [ "$MYSQL_TABLE" == "" ]; then
-    echo-color $red 'テーブルが未設定です'
+    echo-color -e $red 'テーブルが未設定です'
     return 2>&- || exit
   fi
 
@@ -196,7 +189,7 @@ mysql-select() {
 
   if [ "${sql_result}" = "" ]; then
     echo "$sql"
-    echo-color $red "0件"
+    echo-color -e $red "0件"
     return 2>&- || exit
   fi
 
@@ -338,7 +331,13 @@ chain-egrep(){
 }
 
 echo-color() {
-color=$1
+local option=$1
 shift
-echo -e "\033[${color}m$@\033[m"
+local color=$1
+shift
+
+local color_start="\033[${color}m"
+local color_end="\033[m"
+
+echo "${option}" "${color_start}$@${color_end}"
 }
